@@ -1,5 +1,4 @@
 import numpy as np
-import time
 import pandas as pd
 import matplotlib.pyplot as plt
 import torch 
@@ -25,21 +24,28 @@ class MultiLayerPerceptron:
     n_out = self.y_train.shape[1]
 
     #initialize the weights and biases randomly
-    self.weights = [torch.randn(num_feats, self.hidden_size), 
-                    torch.randn(self.hidden_size, self.hidden_size),
-                    torch.randn(self.hidden_size, n_out)]
-    self.biases = [torch.randn(self.hidden_size),
-                   torch.randn(self.hidden_size),
-                   torch.randn(n_out)]
+    self.weights = [torch.randn(num_feats, self.hidden_size).double(), 
+            torch.randn(self.hidden_size, self.hidden_size).double(),
+            torch.randn(self.hidden_size, n_out).double()]
+    self.biases = [torch.randn(self.hidden_size).double(),
+            torch.randn(self.hidden_size).double(),
+            torch.randn(n_out).double()]
 
   def forward(self, x):
     #store the outputs of each layer
     self.a = [x]
 
-    #pass through every layer, executing the matrix multiplication then sigmoid activ fct 
-    for i in range(len(self.weights)):
-      z = torch.mm(self.a[-1], self.weights[i]) + self.biases[i]
-      self.a.append(torch.sigmoid(z))
+    #first hidden layer
+    z1 = torch.mm(self.a[-1].unsqueeze(0), self.weights[0]) + self.biases[0]
+    self.a.append(torch.sigmoid(z1))
+
+    #second hidden layer
+    z2 = torch.mm(self.a[-1], self.weights[1]) + self.biases[1]
+    self.a.append(torch.sigmoid(z2))
+
+    #output layer
+    z3 = torch.mm(self.a[-1], self.weights[2]) + self.biases[2]
+    self.a.append(torch.sigmoid(z3))
 
     return self.a[-1]
   
@@ -54,17 +60,25 @@ class MultiLayerPerceptron:
     dweights = [None] * len(self.weights)
     dbiases = [None] * len(self.biases)
 
-    #backprop through the layers
-    for i in range(len(self.weights)-1, -1, -1):
-      dweights[i] = torch.mm(self.a[i].T, dy_hat)
-      dbiases[i] = torch.sum(dy_hat, axis=0)
+    #output layer
+    dweights[2] = torch.mm(self.a[2].T, dy_hat)
+    dbiases[2] = torch.sum(dy_hat, axis=0)
+    dy_hat = torch.mm(dy_hat, self.weights[2].T) * self.a[2] * (1-self.a[2])
 
-      if i != 0: #skip for this for the first layer, since it's the sigmoid derivative
-        dy_hat = torch.mm(dy_hat, self.weights[i].T) * self.a[i] * (1-self.a[i])
+    #second hidden layer
+    dweights[1] = torch.mm(self.a[1].T, dy_hat)
+    dbiases[1] = torch.sum(dy_hat, axis=0)
+    dy_hat = torch.mm(dy_hat, self.weights[1].T) * self.a[1] * (1-self.a[1])
+
+    #first hidden layer
+    dweights[0] = torch.mm(self.a[0].unsqueeze(0).T, dy_hat)
+    dbiases[0] = torch.sum(dy_hat, axis=0)
 
     return dweights, dbiases
     
-  def train(self, x, y):
+  def train(self):
+    x = self.x_train
+    y = self.y_train
     total_loss = 0
     
     #iterate over each training point 
@@ -82,3 +96,6 @@ class MultiLayerPerceptron:
       
     return total_loss / len(x)
 
+mlp = MultiLayerPerceptron()
+loss = mlp.train()
+print(loss)
