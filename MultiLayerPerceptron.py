@@ -20,16 +20,16 @@ class MultiLayerPerceptron:
     self.y_val = torch.from_numpy(pd.read_csv('data/validation_labels_bin.csv', header=None).values)
 
     #fetch important variable from the data
-    num_feats = self.x_train.shape[1]
-    n_out = self.y_train.shape[1]
+    self.num_feats = self.x_train.shape[1]
+    self.n_out = self.y_train.shape[1]
 
     #initialize the weights and biases randomly
-    self.weights = [torch.randn(num_feats, self.hidden_size).double(), 
+    self.weights = [torch.randn(self.num_feats, self.hidden_size).double(), 
             torch.randn(self.hidden_size, self.hidden_size).double(),
-            torch.randn(self.hidden_size, n_out).double()]
+            torch.randn(self.hidden_size, self.n_out).double()]
     self.biases = [torch.randn(self.hidden_size).double(),
             torch.randn(self.hidden_size).double(),
-            torch.randn(n_out).double()]
+            torch.randn(self.n_out).double()]
 
   def forward(self, x):
     #store the outputs of each layer
@@ -75,26 +75,84 @@ class MultiLayerPerceptron:
     dbiases[0] = torch.sum(dy_hat, axis=0)
 
     return dweights, dbiases
+
+  def test(self):
+    val_sse = 0
+
+    for i in range(len(self.x_val)):
+      x_in = self.x_val[i]#.reshape(1, self.num_feats)
+      y = self.y_val[i]#.reshape(1, self.n_out)
+
+      #predict
+      y_hat = self.forward(x_in)
+
+      #compute loss
+      val_loss = self.loss(y_hat, y)
+      val_sse += val_loss
+
+    #compute mean squared error
+    val_mse = val_sse / len(self.x_val)
+
+    return val_mse 
     
   def train(self):
+    train_mses = []
+    val_mses = []
     x = self.x_train
     y = self.y_train
-    total_loss = 0
     
-    #iterate over each training point 
-    for i in range(len(x)):
-      y_hat = self.forward(x[i])
-      loss = self.loss(y_hat, y[i])
-      total_loss += loss.item()
+    for epoch in range(0, self.max_epoch):
+      #shuffle data
+      order = np.random.permutation(len(x))
 
-      dweights, dbiases = self.backward(x[i], y[i], y_hat)
+      sse = 0
+      for n in range(0,len(x)):
+        idx = order[n]
+        
+        #get a sample (batch size=1)
+        x_in = self.x_train[idx]#.reshape((self.num_feats,1))
+        y = self.y_train[idx]#.reshape((self.n_out, 1))
+        
+        #do the forward pass here
+        y_hat = self.forward(x_in)
+        
+        #compute loss
+        loss = self.loss(y_hat, self.y_train[idx])
+        sse += loss
 
-      #update weights and biases
-      for j in range(len(self.weights)):
-        self.weights[j] -= self.eta * dweights[j]
-        self.biases[j] -= self.eta * dbiases[j]
+        #compute gradients
+        dweights, dbiases = self.backward(x_in, y, y_hat)
+
+        #update weights and biases
+        for j in range(len(self.weights)):
+          self.weights[j] -= self.eta * dweights[j]
+          self.biases[j] -= self.eta * dbiases[j]
+          
+      train_mse = sse / len(self.x_train)
+      train_mses.append(train_mse)
+
+      if epoch % self.test_interval == 0: 
+        val_mse = self.test()
+        val_mses.append(val_mse)
+        print(f'Epoch {epoch}: train MSE = {train_mse}, validation MSE = {val_mse}')
+        # if termination condition is satisfied, exit
+        if val_mse < self.threshold:
+          print("val_mse < threshold")
+          break
+
+      #MIGHT IMPLEMENT LATER
+      # if epoch % self.stepsize == 0 and epoch != 0:
+      #     self.eta = self.eta * self.gamma
+      #     print('Changed learning rate to lr=' + str(self.eta))
+          
+    plt.plot(train_mses, label='Training MSE')
+    plt.plot(np.arange(0, len(train_mses), self.test_interval), val_mses, label='Validation MSE')
+    plt.xlabel('Epoch')
+    plt.ylabel('MSE')
+    plt.legend()
+    plt.show()
+    return train_mse
       
-    return total_loss / len(x)
 
 mlp = MultiLayerPerceptron()
 loss = mlp.train()
