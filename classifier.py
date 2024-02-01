@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 
 class Data:
 
-    def generateData(self, numSamples, fileName):
+    def generateData(self, numSamplesEachClass, fileName):
 
         data = [["x1", "x2", "class"]]
 
-        for i in range(numSamples):
+        for i in range(numSamplesEachClass):
             # Generate the random numbers
             r0 = random.gauss(0.0, 1.0)
             t0= random.uniform(0, 2*np.pi)
@@ -66,7 +66,7 @@ class Classifier(nn.Module):
 
 class Learner:
 
-    def __init__(self, learningRate=0.0001, batchSize=32, numEpochs = 500, splitTrain = 80, dataFile ="gen_data.csv", dataSize = 300, save=10):
+    def __init__(self, train = False, learningRate=0.001, batchSize=64, numEpochs = 100, splitTrain = 70, dataFile ="gen_data.csv", dataSize = 1000, save=10, saveLocation= "classifier.pth"):
         
         # Parameters
         self.learningRate = learningRate
@@ -76,11 +76,19 @@ class Learner:
         self.dataSize = dataSize
         self.dataFile = dataFile
         self.save = save
-
+        self.saveLocation = saveLocation
+        self.train = train  # Setting this parameter to true trains a new model, when it is false, it retrieves the existing model
+        self.dataTrain = None
+        self.dataValidation = None
         # Initialize the classifier
         self.classifier = Classifier()
-        self.criterion = nn.BCELoss()
-        self.optimizer = optim.Adam(self.classifier.parameters(), lr=self.learningRate)
+
+        if not self.train:
+            state_dict = torch.load(self.saveLocation)
+            self.classifier.load_state_dict(state_dict)
+        else:
+            self.criterion = nn.BCELoss()
+            self.optimizer = optim.Adam(self.classifier.parameters(), lr=self.learningRate)
 
         # Saving the Accuracies
         self.trainingAccuracies = []
@@ -156,15 +164,19 @@ class Learner:
         plt.legend()
         plt.show()
 
-    def plotData(self, dataX1, dataX2, dataY):
+    def plotDataAndDecisionBoundary(self):
         
+        if self.dataValidation is None:
+            self.dataTrain, self.dataValidation = self.retrieveSplitData()
+        
+        dataX1 = self.dataValidation[:, 0]
+        dataX2 = self.dataValidation[:, 1]
+        dataY = self.dataValidation[:, 2]
+
+        self.classifier.eval()
+
         # divide the data into classes
-
-        dataX1label0 = []
-        dataX2label0 = []
-        dataX1label1 = []
-        dataX2label1 = []
-
+        dataX1label0, dataX2label0, dataX1label1, dataX2label1 = [], [], [], []
 
         for d in range (len(dataX1)):
             if dataY[d] == 0:
@@ -173,6 +185,16 @@ class Learner:
             else:
                 dataX1label1.append(dataX1[d])
                 dataX2label1.append(dataX2[d])
+
+        x1Min, x1Max = dataX1.min() -1, dataX1.max()+1
+        x2Min, x2Max = dataX2.min() -1, dataX2.max()+1
+        xx, yy = np.meshgrid(np.arange(x1Min, x1Max, 0.01), np.arange(x2Min, x2Max, 0.01))
+        grid = torch.tensor(np.c_[xx.ravel(), yy.ravel()], dtype=torch.float32)
+
+        with torch.no_grad():
+            output = self.classifier(grid).numpy().reshape(xx.shape)
+
+        plt.contour(xx, yy, output, levels=[0.5], colors="black")
 
         plt.scatter(dataX1label0, dataX2label0, label="Class 0", color="blue", marker="o")
         plt.scatter(dataX1label1, dataX2label1, label= "Class 1", color="orange", marker="^")
@@ -183,10 +205,8 @@ class Learner:
 
     def trainingLoop(self):
 
-        dataTrain, dataValidation = self.retrieveSplitData()
-        self.plotData(dataValidation[:, 0],dataValidation[:, 1], dataValidation[:, 2])
-
-        batches = self.generateBatches(dataTrain)
+        self.dataTrain, self.dataValidation = self.retrieveSplitData()
+        batches = self.generateBatches(self.dataTrain)
 
         for i in range (self.numEpochs):
             self.classifier.train()
@@ -199,15 +219,16 @@ class Learner:
                 loss.backward()
                 self.optimizer.step()
 
-            self.evalTrainValidationSets(dataTrain[:, :2], dataTrain[:, 2], dataValidation[:, :2], dataValidation[:, 2])
+            self.evalTrainValidationSets(self.dataTrain[:, :2], self.dataTrain[:, 2], self.dataValidation[:, :2], self.dataValidation[:, 2])
 
             if i % self.save ==0 or i==(self.numEpochs-1):
-                torch.save(self.classifier.state_dict(), "classifier.pth")
+                torch.save(self.classifier.state_dict(), self.saveLocation)
                 print("The model has been saved at epoch number "+ str(i))
 
         self.plotAccuracies()
 
 if __name__ == '__main__':
 
-    l = Learner()
-    l.trainingLoop()
+    l = Learner(train=False)
+    # l.trainingLoop()
+    l.plotDataAndDecisionBoundary()
