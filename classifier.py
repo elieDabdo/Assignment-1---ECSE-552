@@ -164,7 +164,7 @@ class Learner:
         plt.legend()
         plt.show()
 
-    def plotDataAndDecisionBoundary(self):
+    def plotDataAndDecisionBoundary(self, smooth= False):
         
         if self.dataValidation is None:
             self.dataTrain, self.dataValidation = self.retrieveSplitData()
@@ -186,16 +186,29 @@ class Learner:
                 dataX1label1.append(dataX1[d])
                 dataX2label1.append(dataX2[d])
 
-        x1Min, x1Max = dataX1.min() -1, dataX1.max()+1
-        x2Min, x2Max = dataX2.min() -1, dataX2.max()+1
-        xx, yy = np.meshgrid(np.arange(x1Min, x1Max, 0.01), np.arange(x2Min, x2Max, 0.01))
-        grid = torch.tensor(np.c_[xx.ravel(), yy.ravel()], dtype=torch.float32)
+        x1Min, x1Max = dataX1.min(), dataX1.max()
+        x2Min, x2Max = dataX2.min(), dataX2.max()
+        
+        # Smooth decision boundary 
+        if smooth:
+            xx, yy = np.meshgrid(np.arange(x1Min, x1Max, 0.01), np.arange(x2Min, x2Max, 0.01))
+            grid = torch.tensor(np.c_[xx.ravel(), yy.ravel()], dtype=torch.float32)
+            with torch.no_grad():
+                output = self.classifier(grid).numpy().reshape(xx.shape)
+            plt.contour(xx, yy, output, levels=[0.5], colors="black")
 
-        with torch.no_grad():
-            output = self.classifier(grid).numpy().reshape(xx.shape)
+        # Draw lines for each neuron decision boundary
+        else:
+            x1 = np.arange(x1Min, x1Max, 0.01)
+            weights = self.classifier.layer1.weight.detach().numpy()
+            biases = self.classifier.layer1.bias.detach().numpy()
 
-        plt.contour(xx, yy, output, levels=[0.5], colors="black")
+            for i in range(weights.shape[0]):
+                x2 = -(weights[i,0] * x1 + biases[i])/weights[i, 1]
+                plt.plot(x1, x2)
 
+        plt.xlim(-6, 6)
+        plt.ylim(-6, 6)
         plt.scatter(dataX1label0, dataX2label0, label="Class 0", color="blue", marker="o")
         plt.scatter(dataX1label1, dataX2label1, label= "Class 1", color="orange", marker="^")
         plt.legend()
@@ -231,4 +244,4 @@ if __name__ == '__main__':
 
     l = Learner(train=False)
     # l.trainingLoop()
-    l.plotDataAndDecisionBoundary()
+    l.plotDataAndDecisionBoundary(True)
