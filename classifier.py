@@ -80,9 +80,9 @@ class Learner:
         self.train = train  # Setting this parameter to true trains a new model, when it is false, it retrieves the existing model
         self.dataTrain = None
         self.dataValidation = None
+
         # Initialize the classifier
         self.classifier = Classifier()
-
         if not self.train:
             state_dict = torch.load(self.saveLocation)
             self.classifier.load_state_dict(state_dict)
@@ -95,16 +95,14 @@ class Learner:
         self.validationAccuracies = []
 
     def retrieveSplitData(self):
-
         d = Data()
         data = d.loadData(self.dataFile)
 
+        # Shuffle the data and retrive the train and validate splits
         random.shuffle(data)
         numTrain = int(self.splitTrain/100*self.dataSize)
-
         dataTrain = data[:numTrain]
         dataValidation = data[numTrain:]
-
         return [dataTrain, dataValidation]
     
 
@@ -119,7 +117,6 @@ class Learner:
 
     def evalTrainValidationSets(self, dataTrainX_np, dataTrainY, dataValidationX_np, dataValidationY):
         self.classifier.eval()
-
         trueTrain = 0
         trueValidation = 0
 
@@ -129,7 +126,7 @@ class Learner:
         with torch.no_grad():
             trainOut = (self.classifier(dataTrainX)).numpy()
 
-            trainOutNormalized = np.where(trainOut >=0.5,1,0)
+            trainOutNormalized = np.where(trainOut >=0.5, 1, 0)
 
             for t in range (len(dataTrainX)):
                 if trainOutNormalized[t] == dataTrainY[t]:
@@ -234,14 +231,24 @@ class Learner:
 
             self.evalTrainValidationSets(self.dataTrain[:, :2], self.dataTrain[:, 2], self.dataValidation[:, :2], self.dataValidation[:, 2])
 
-            if i % self.save ==0 or i==(self.numEpochs-1):
+            if i % self.save == 0 or i==(self.numEpochs-1):
                 torch.save(self.classifier.state_dict(), self.saveLocation)
                 print("The model has been saved at epoch number "+ str(i))
 
         self.plotAccuracies()
 
 if __name__ == '__main__':
+    
+    # To generate new data, uncomment the 2 following lines
+    # dataGen = Data ()
+    # dataGen.generateData(numSamplesEachClass=500, fileName= "gen_data.csv")
 
-    l = Learner(train=False)
-    # l.trainingLoop()
-    l.plotDataAndDecisionBoundary(True)
+    # To train a new model, change the train param below
+    # To use the existing model, use the file save location
+    learner = Learner(train=False, saveLocation="classifier.pth")
+    
+    # Uncomment this line to train 
+    # learner.trainingLoop()
+
+    # To plot the individual decision boundaries of each neuron, turn smooth to false
+    learner.plotDataAndDecisionBoundary(smooth=True)
