@@ -110,8 +110,8 @@ class MultiLayerPerceptron:
         idx = order[n]
         
         #get a sample (batch size=1)
-        x_in = self.x_train[idx]#.reshape((self.num_feats,1))
-        y = self.y_train[idx]#.reshape((self.n_out, 1))
+        x_in = self.x_train[idx]
+        y = self.y_train[idx]
         
         #do the forward pass here
         y_hat = self.forward(x_in)
@@ -137,23 +137,19 @@ class MultiLayerPerceptron:
         print(f'Epoch {epoch}: train MSE = {train_mse}, validation MSE = {val_mse}')
         # if termination condition is satisfied, exit
         if val_mse < self.threshold:
-          print("val_mse < threshold")
+          print(f"Training stopped because the validation MSE ({val_mse}) reached the threshold ({self.threshold})")
           break
-
-      #MIGHT IMPLEMENT LATER
-      # if epoch % self.stepsize == 0 and epoch != 0:
-      #     self.eta = self.eta * self.gamma
-      #     print('Changed learning rate to lr=' + str(self.eta))
-          
+    
+    #plot the training and validation mses
     plt.plot(train_mses, label='Training MSE')
     plt.plot(np.arange(0, len(train_mses), self.test_interval), val_mses, label='Validation MSE')
     plt.xlabel('Epoch')
     plt.ylabel('MSE')
     plt.legend()
     plt.show()
-    return train_mse
-      
 
-mlp = MultiLayerPerceptron()
-loss = mlp.train()
-print(loss)
+if __name__ == "__main__":
+  #init a mlp
+  mlp = MultiLayerPerceptron()
+  #train it and display the plot
+  mlp.train()
