@@ -245,10 +245,11 @@ if __name__ == '__main__':
 
     # To train a new model, change the train param below
     # To use the existing model, use the file save location
-    learner = Learner(train=False, saveLocation="classifier.pth")
+    learner = Learner(train=True, saveLocation="classifier.pth")
     
     # Uncomment this line to train 
-    # learner.trainingLoop()
+    learner.trainingLoop()
 
     # To plot the individual decision boundaries of each neuron, turn smooth to false
     learner.plotDataAndDecisionBoundary(smooth=True)
+    learner.plotDataAndDecisionBoundary(smooth=False)
